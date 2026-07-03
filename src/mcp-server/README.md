@@ -1,25 +1,90 @@
-# Termix MCP Server
+<div align="center">
 
-A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes
-a [Termix](https://github.com/Termix-SSH/Termix) instance to MCP clients such as
-Claude Code and Claude Desktop. It talks to the Termix HTTP API over `axios` and
-is fully self-contained (its own `package.json` / `node_modules`), so it can run
-alongside Termix or be extracted into a standalone package.
+<h1>Termix MCP Server</h1>
+
+<p>Model Context Protocol server for Termix — drive your servers from an AI assistant</p>
+
+<p>
+  <img src="https://img.shields.io/badge/MCP-server-F39044?style=flat&labelColor=1a1a1a" />
+  <img src="https://img.shields.io/badge/Node-%E2%89%A522.12-F39044?style=flat&labelColor=1a1a1a" />
+  <img src="https://img.shields.io/badge/TypeScript-ESM-F39044?style=flat&labelColor=1a1a1a" />
+  <img src="https://img.shields.io/badge/Transport-stdio-F39044?style=flat&labelColor=1a1a1a" />
+</p>
+
+</div>
+
+<br />
+
+## Overview
+
+The Termix MCP Server exposes a [Termix](https://github.com/Termix-SSH/Termix) instance to
+[Model Context Protocol](https://modelcontextprotocol.io) clients such as Claude Code and Claude
+Desktop. It lets an AI assistant list and manage your SSH hosts, run commands, browse and edit files
+over SFTP, read live host metrics, and control Docker containers — all through Termix's existing API
+and permission model.
+
+It talks to Termix over HTTP with `axios` and is fully self-contained (its own `package.json` and
+`node_modules`), so it runs alongside Termix or as a standalone package.
+
+<br />
+
+## Features
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**Host management:**
+List, inspect, create, update and delete SSH hosts. Secrets are never returned through the server.
+
+</td>
+<td width="50%" valign="top">
+
+**Command execution:**
+Run one-off shell commands or saved snippets on any host and get back stdout, stderr and exit code.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**File manager (SFTP):**
+List, read, write, create, rename, move and delete files. Sessions are pooled per host and kept
+alive transparently.
+
+</td>
+<td width="50%" valign="top">
+
+**Monitoring & Docker:**
+Live CPU / memory / disk / network metrics, alerts, audit logs, and Docker container list / start /
+stop / logs.
+
+</td>
+</tr>
+</table>
+
+<br />
 
 ## Requirements
 
 - Node.js ≥ 22.12
 - A running Termix instance reachable over HTTP(S)
-- Termix credentials: an API key and/or a username + password (see
-  [Authentication](#authentication))
+- Termix credentials: an API key and/or a username + password (see [Authentication](#authentication))
 
-## Install & build
+> **Note:** the `run_command` tool relies on the `POST /host/execute` endpoint. If your Termix build
+> does not include it, use `execute_snippet` instead.
+
+<br />
+
+## Installation
 
 ```sh
 cd src/mcp-server
 npm install
 npm run build      # compiles to dist/
 ```
+
+<br />
 
 ## Configuration
 
@@ -35,29 +100,30 @@ Configuration is read from environment variables:
 | `TERMIX_INSECURE_TLS` | no | `true` to accept self-signed certificates (test only). |
 | `TERMIX_REQUEST_TIMEOUT_MS` | no | Per-request timeout (default `60000`). |
 
-At least one authentication method is required. To cover **every** tool
-(command execution, host/credential access, file manager, metrics), configure
-`TERMIX_USERNAME` + `TERMIX_PASSWORD` — see below.
+At least one authentication method is required. To cover **every** tool (command execution,
+host/credential access, file manager, metrics), configure `TERMIX_USERNAME` + `TERMIX_PASSWORD`.
+
+<br />
 
 ## Authentication
 
-Termix encrypts each user's sensitive data (host secrets, credentials) with a
-key derived from their password and held in memory after login. Two consequences
-shape this server's hybrid auth:
+Termix encrypts each user's sensitive data (host secrets, credentials) with a key derived from their
+password and held in memory after login. Two consequences shape this server's hybrid auth:
 
-- **API key** authenticates identity and is enough for read-only,
-  non-encrypted endpoints (alerts, audit logs, user list).
-- **Encrypted-data operations** (listing/reading hosts, credentials, running
-  commands, file manager, metrics) require a **JWT obtained by logging in with a
-  username + password**. The server logs in on demand — sending the
-  `X-Electron-App: true` header so Termix returns the token — caches the JWT,
+- **API key** authenticates identity and is enough for read-only, non-encrypted endpoints (alerts,
+  audit logs, user list).
+- **Encrypted-data operations** (listing/reading hosts, credentials, running commands, file manager,
+  metrics) require a **JWT obtained by logging in with a username + password**. The server logs in on
+  demand — sending the `X-Electron-App: true` header so Termix returns the token — caches the JWT,
   refreshes it before expiry, and retries once on a `401`.
 
-If only an API key is configured, encrypted-data tools are attempted with it and
-will fail cleanly if the account's data is locked.
+If only an API key is configured, encrypted-data tools are attempted with it and fail cleanly if the
+account's data is locked.
 
-> **TOTP:** accounts with TOTP enabled are not yet supported — use an account
-> without TOTP, or an API key for the read-only subset.
+> **TOTP:** accounts with TOTP enabled are not yet supported — use an account without TOTP, or an API
+> key for the read-only subset.
+
+<br />
 
 ## Registering with a client
 
@@ -65,7 +131,7 @@ will fail cleanly if the account's data is locked.
 claude mcp add termix -- node /absolute/path/to/src/mcp-server/dist/index.js
 ```
 
-Provide the environment variables in your client's MCP configuration, e.g.:
+Or configure it directly in your client:
 
 ```json
 {
@@ -82,6 +148,8 @@ Provide the environment variables in your client's MCP configuration, e.g.:
   }
 }
 ```
+
+<br />
 
 ## Tools
 
@@ -104,18 +172,20 @@ Provide the environment variables in your client's MCP configuration, e.g.:
 | `docker_start` / `docker_stop` | Start / stop a container. ⚠️(stop) | api key |
 | `list_users` | List user accounts (admin). | api key |
 
-⚠️ = carries destructive/open-world annotations so clients can prompt for
-confirmation. "login" = requires `TERMIX_USERNAME` + `TERMIX_PASSWORD`.
+⚠️ = carries destructive/open-world annotations so clients can prompt for confirmation.
+"login" = requires `TERMIX_USERNAME` + `TERMIX_PASSWORD`.
+
+<br />
 
 ## Notes
 
-- **`run_command`** uses the `POST /host/execute` backend endpoint added in this
-  fork. Against an unpatched Termix, use `execute_snippet` instead.
-- **Host-key trust:** command execution and metrics follow Termix's server-side
-  behaviour, which auto-accepts unknown host keys on these non-interactive
-  paths.
-- **File-manager / Docker sessions** are pooled per host (lazy connect,
-  keepalive, idle close, transparent reconnect) — invisible to the tools.
+- **Host-key trust:** command execution and metrics follow Termix's server-side behaviour, which
+  auto-accepts unknown host keys on these non-interactive paths.
+- **File-manager / Docker sessions** are pooled per host (lazy connect, keepalive, idle close,
+  transparent reconnect) — invisible to the tools.
+- **Logs** go to stderr; stdout is reserved for the MCP protocol.
+
+<br />
 
 ## Development
 
@@ -123,4 +193,23 @@ confirmation. "login" = requires `TERMIX_USERNAME` + `TERMIX_PASSWORD`.
 npm run type-check
 npm test           # vitest
 npm run build
+```
+
+<br />
+
+## Architecture
+
+```
+src/mcp-server/
+├── src/
+│   ├── index.ts            # stdio entrypoint (McpServer + StdioServerTransport)
+│   ├── config.ts           # env configuration (zod)
+│   ├── client/
+│   │   ├── http.ts         # axios wrapper + auth attach + error mapping
+│   │   ├── auth.ts         # hybrid API-key / JWT-login manager
+│   │   ├── session-pool.ts # generic pooled SSH sessions
+│   │   └── fm-session.ts   # file-manager session pool
+│   ├── tools/              # monitoring, exec, files, docker, hosts
+│   └── util/               # logger (stderr), result helpers
+└── test/                   # vitest
 ```
