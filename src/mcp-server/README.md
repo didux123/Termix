@@ -90,15 +90,15 @@ npm run build      # compiles to dist/
 
 Configuration is read from environment variables:
 
-| Variable | Required | Description |
-|---|---|---|
-| `TERMIX_URL` | yes | Base URL of the instance (the nginx entrypoint, e.g. `https://termix.example.com`) — not an internal port. |
-| `TERMIX_API_KEY` | see below | API key (`tmx_…`) for read-only, non-encrypted endpoints. |
-| `TERMIX_USERNAME` | see below | Username for JWT login (required for encrypted-data operations). |
-| `TERMIX_PASSWORD` | see below | Password for the above user. |
-| `TERMIX_TOTP_CODE` | no | Reserved; accounts with TOTP are not yet supported. |
-| `TERMIX_INSECURE_TLS` | no | `true` to accept self-signed certificates (test only). |
-| `TERMIX_REQUEST_TIMEOUT_MS` | no | Per-request timeout (default `60000`). |
+| Variable                    | Required  | Description                                                                                                |
+| --------------------------- | --------- | ---------------------------------------------------------------------------------------------------------- |
+| `TERMIX_URL`                | yes       | Base URL of the instance (the nginx entrypoint, e.g. `https://termix.example.com`) — not an internal port. |
+| `TERMIX_API_KEY`            | see below | API key (`tmx_…`) for read-only, non-encrypted endpoints.                                                  |
+| `TERMIX_USERNAME`           | see below | Username for JWT login (required for encrypted-data operations).                                           |
+| `TERMIX_PASSWORD`           | see below | Password for the above user.                                                                               |
+| `TERMIX_TOTP_CODE`          | no        | Reserved; accounts with TOTP are not yet supported.                                                        |
+| `TERMIX_INSECURE_TLS`       | no        | `true` to accept self-signed certificates (test only).                                                     |
+| `TERMIX_REQUEST_TIMEOUT_MS` | no        | Per-request timeout (default `60000`).                                                                     |
 
 At least one authentication method is required. To cover **every** tool (command execution,
 host/credential access, file manager, metrics), configure `TERMIX_USERNAME` + `TERMIX_PASSWORD`.
@@ -122,6 +122,10 @@ account's data is locked.
 
 > **TOTP:** accounts with TOTP enabled are not yet supported — use an account without TOTP, or an API
 > key for the read-only subset.
+
+> **Use a dedicated, least-privilege account.** The `TERMIX_PASSWORD` (and API key) live in plaintext
+> in your MCP client's configuration. Create a Termix account scoped to only the hosts and permissions
+> the assistant needs — not your admin account — so a leaked config file limits the blast radius.
 
 <br />
 
@@ -153,24 +157,24 @@ Or configure it directly in your client:
 
 ## Tools
 
-| Tool | Description | Auth |
-|---|---|---|
-| `list_hosts` | List SSH hosts (optional folder filter). | login |
-| `get_host` | Get one host's config (secrets stripped). | login |
-| `get_host_metrics` | Live CPU/memory/disk/uptime/network for a host. | login |
-| `list_alerts` | Active Termix alerts. | api key |
-| `get_audit_logs` | Audit-log entries (admin only). | api key |
-| `list_snippets` | Saved command snippets. | api key |
-| `execute_snippet` | Run a saved snippet on a host. ⚠️ | login |
-| `run_command` | Run a shell command on a host. ⚠️ | login |
-| `fm_list` / `fm_read` | List a directory / read a file (SFTP). | login |
-| `fm_write` / `fm_create` | Write a file / create a file or folder. ⚠️ | login |
-| `fm_delete` / `fm_rename` / `fm_move` | Delete / rename / move. ⚠️ | login |
-| `create_host` / `update_host` / `delete_host` | Manage hosts. ⚠️(delete) | login |
-| `list_credentials` | SSH credential metadata (no secrets). | login |
-| `docker_list` / `docker_logs` | List containers / read logs. | api key |
-| `docker_start` / `docker_stop` | Start / stop a container. ⚠️(stop) | api key |
-| `list_users` | List user accounts (admin). | api key |
+| Tool                                          | Description                                     | Auth    |
+| --------------------------------------------- | ----------------------------------------------- | ------- |
+| `list_hosts`                                  | List SSH hosts (optional folder filter).        | login   |
+| `get_host`                                    | Get one host's config (secrets stripped).       | login   |
+| `get_host_metrics`                            | Live CPU/memory/disk/uptime/network for a host. | login   |
+| `list_alerts`                                 | Active Termix alerts.                           | api key |
+| `get_audit_logs`                              | Audit-log entries (admin only).                 | api key |
+| `list_snippets`                               | Saved command snippets.                         | api key |
+| `execute_snippet`                             | Run a saved snippet on a host. ⚠️               | login   |
+| `run_command`                                 | Run a shell command on a host. ⚠️               | login   |
+| `fm_list` / `fm_read`                         | List a directory / read a file (SFTP).          | login   |
+| `fm_write` / `fm_create`                      | Write a file / create a file or folder. ⚠️      | login   |
+| `fm_delete` / `fm_rename` / `fm_move`         | Delete / rename / move. ⚠️                      | login   |
+| `create_host` / `update_host` / `delete_host` | Manage hosts. ⚠️(delete)                        | login   |
+| `list_credentials`                            | SSH credential metadata (no secrets).           | login   |
+| `docker_list` / `docker_logs`                 | List containers / read logs.                    | api key |
+| `docker_start` / `docker_stop`                | Start / stop a container. ⚠️(stop)              | api key |
+| `list_users`                                  | List user accounts (admin).                     | api key |
 
 ⚠️ = carries destructive/open-world annotations so clients can prompt for confirmation.
 "login" = requires `TERMIX_USERNAME` + `TERMIX_PASSWORD`.
