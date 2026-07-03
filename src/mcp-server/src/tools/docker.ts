@@ -4,17 +4,22 @@ import { type TermixClient, TermixApiError } from "../client/http.js";
 import { SshSessionPool } from "../client/session-pool.js";
 import { jsonResult, errorResult } from "../util/result.js";
 
-function isStaleSession(error: unknown): boolean {
+/**
+ * A dropped docker session surfaces as "SSH session not found or not
+ * connected". Match only that — other 400s (e.g. invalid container id) are
+ * genuine errors and must not trigger a reconnect+retry.
+ */
+export function isStaleSession(error: unknown): boolean {
   return (
     error instanceof TermixApiError &&
-    (error.status === 400 || /connection/i.test(error.message))
+    /session not found or not connected/i.test(error.message)
   );
 }
 
 export function registerDockerTools(
   server: McpServer,
   client: TermixClient,
-): void {
+): SshSessionPool {
   // Docker connect resolves everything from the host id server-side.
   const pool = new SshSessionPool(client, {
     label: "docker",
@@ -159,4 +164,6 @@ export function registerDockerTools(
       }
     },
   );
+
+  return pool;
 }

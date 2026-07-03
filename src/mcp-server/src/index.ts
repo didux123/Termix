@@ -21,9 +21,21 @@ async function main(): Promise<void> {
 
   registerMonitoringTools(server, client);
   registerExecTools(server, client);
-  registerFileTools(server, client);
-  registerDockerTools(server, client);
+  const fmPool = registerFileTools(server, client);
+  const dockerPool = registerDockerTools(server, client);
   registerHostTools(server, client);
+
+  // Close pooled SSH sessions cleanly on shutdown so they don't linger
+  // server-side until their idle timeout.
+  let shuttingDown = false;
+  const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    await Promise.allSettled([fmPool.closeAll(), dockerPool.closeAll()]);
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

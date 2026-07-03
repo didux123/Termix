@@ -19,6 +19,59 @@ interface HostSummary {
   enableDocker?: boolean;
 }
 
+/**
+ * Non-secret host fields safe to expose through `get_host`. An allowlist (vs a
+ * blacklist of secret keys) guarantees that any future secret field added by the
+ * backend cannot leak by default.
+ */
+const SAFE_HOST_FIELDS = [
+  "id",
+  "userId",
+  "name",
+  "ip",
+  "port",
+  "username",
+  "connectionType",
+  "authType",
+  "folder",
+  "tags",
+  "pin",
+  "credentialId",
+  "vaultProfileId",
+  "overrideCredentialUsername",
+  "useWarpgate",
+  "forceKeyboardInteractive",
+  "keyType",
+  "enableTerminal",
+  "enableTunnel",
+  "enableFileManager",
+  "enableDocker",
+  "enableTmuxMonitor",
+  "enableSessionLogging",
+  "enableCommandHistory",
+  "scpLegacy",
+  "tunnelConnections",
+  "jumpHosts",
+  "quickActions",
+  "defaultPath",
+  "showTerminalInSidebar",
+  "showFileManagerInSidebar",
+  "showTunnelInSidebar",
+  "showDockerInSidebar",
+  "showServerStatsInSidebar",
+  "createdAt",
+  "updatedAt",
+] as const;
+
+/** Return only allowlisted, non-secret fields of a host record. */
+function sanitiseHost(host: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of SAFE_HOST_FIELDS) {
+    if (key in host) out[key] = host[key];
+  }
+  return out;
+}
+
 function summariseHost(host: Record<string, unknown>): HostSummary {
   return {
     id: host.id as number,
@@ -92,19 +145,7 @@ export function registerMonitoringTools(
           path: `/host/db/host/${hostId}`,
           requiresData: true,
         });
-        // Never surface secret material through the MCP.
-        for (const key of [
-          "password",
-          "key",
-          "keyPassword",
-          "sudoPassword",
-          "autostartPassword",
-          "autostartKey",
-          "autostartKeyPassword",
-        ]) {
-          delete host[key];
-        }
-        return jsonResult(host);
+        return jsonResult(sanitiseHost(host));
       } catch (error) {
         return errorResult(error);
       }

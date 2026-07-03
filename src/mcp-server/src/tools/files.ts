@@ -6,18 +6,23 @@ import { jsonResult, errorResult } from "../util/result.js";
 
 const FM = "/ssh/file_manager/ssh";
 
-/** A dropped SSH session surfaces as a 400 "SSH connection not established". */
-function isStaleSession(error: unknown): boolean {
+/**
+ * A dropped file-manager session surfaces as the specific message
+ * "SSH connection not established". Match only that — other 400s (invalid path,
+ * missing parameter) are genuine errors and must not trigger a reconnect+retry,
+ * which could re-run a non-idempotent operation.
+ */
+export function isStaleSession(error: unknown): boolean {
   return (
     error instanceof TermixApiError &&
-    (error.status === 400 || /SSH connection/i.test(error.message))
+    /SSH connection not established/i.test(error.message)
   );
 }
 
 export function registerFileTools(
   server: McpServer,
   client: TermixClient,
-): void {
+): FileManagerSessionPool {
   const pool = new FileManagerSessionPool(client);
 
   /** Run an operation with a live session, reconnecting once if it went stale. */
@@ -71,23 +76,42 @@ export function registerFileTools(
     {
       title: "Read a file",
       description:
-        "Read the contents of a file on a host via SFTP. Text is returned as UTF-8; binary content is base64-encoded (see the encoding field).",
+        "Read the contents of a file on a host via SFTP. Text is returned as UTF-8; binary content is base64-encoded (see the encoding field). Content larger than maxBytes is truncated to keep it out of the model context.",
       inputSchema: {
         hostId: z.number().int(),
         path: z.string().describe("Absolute file path."),
+        maxBytes: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Maximum content bytes to return (default 1048576)."),
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ hostId, path }) => {
+    async ({ hostId, path, maxBytes }) => {
       try {
         const data = await withSession(hostId, (sessionId) =>
-          client.request({
+          client.request<{ content?: string; [k: string]: unknown }>({
             method: "GET",
             path: `${FM}/readFile`,
             params: { sessionId, path },
             requiresData: false,
           }),
         );
+
+        const limit = maxBytes ?? 1_048_576;
+        const content = typeof data.content === "string" ? data.content : "";
+        if (content.length > limit) {
+          return jsonResult({
+            ...data,
+            content: content.slice(0, limit),
+            truncated: true,
+            returnedBytes: limit,
+            totalBytes: content.length,
+            note: `Content truncated to ${limit} bytes; pass a larger maxBytes to read more.`,
+          });
+        }
         return jsonResult(data);
       } catch (error) {
         return errorResult(error);
@@ -252,4 +276,6 @@ export function registerFileTools(
       }
     },
   );
+
+  return pool;
 }
