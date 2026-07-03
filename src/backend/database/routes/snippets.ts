@@ -12,10 +12,9 @@ import { eq, and, desc, asc, sql, or, isNull, gte } from "drizzle-orm";
 import type { Request, Response } from "express";
 import { authLogger, databaseLogger } from "../../utils/logger.js";
 import { AuthManager } from "../../utils/auth-manager.js";
-import { SSH_ALGORITHMS } from "../../utils/ssh-algorithms.js";
 import { extractSnippetReorderUpdates } from "./snippets-reorder.js";
 import { logAudit, getRequestMeta } from "../../utils/audit-logger.js";
-import { applyAgentAuth } from "../../ssh/terminal-auth-helpers.js";
+import { resolveHostAuth, runCommandOnHost } from "../../ssh/ssh-exec.js";
 
 const router = express.Router();
 
@@ -719,201 +718,23 @@ router.post(
         return res.status(404).json({ error: "Snippet not found" });
       }
 
-      const { Client } = await import("ssh2");
-      const { hosts, sshCredentials } = await import("../db/schema.js");
+      const auth = await resolveHostAuth(parseInt(hostId), userId);
 
-      const { SimpleDBOps } = await import("../../utils/simple-db-ops.js");
-
-      const hostResult = await SimpleDBOps.select(
-        db
-          .select()
-          .from(hosts)
-          .where(and(eq(hosts.id, parseInt(hostId)), eq(hosts.userId, userId))),
-        "ssh_data",
-        userId,
-      );
-
-      if (hostResult.length === 0) {
+      if (!auth) {
         return res.status(404).json({ error: "Host not found" });
       }
 
-      const host = hostResult[0];
+      const execResult = await runCommandOnHost(auth, snippet.content);
 
-      let password = host.password;
-      let privateKey = host.key;
-      let passphrase = host.keyPassword;
-      let authType = host.authType;
-
-      if (host.credentialId) {
-        const credResult = await SimpleDBOps.select(
-          db
-            .select()
-            .from(sshCredentials)
-            .where(
-              and(
-                eq(sshCredentials.id, host.credentialId as number),
-                eq(sshCredentials.userId, userId),
-              ),
-            ),
-          "ssh_credentials",
-          userId,
-        );
-
-        if (credResult.length > 0) {
-          const cred = credResult[0];
-          authType = (cred.authType || authType) as string;
-          password = (cred.password || undefined) as string | undefined;
-          privateKey = (cred.privateKey || cred.key || undefined) as
-            | string
-            | undefined;
-          passphrase = (cred.keyPassword || undefined) as string | undefined;
-        }
-      }
-
-      const conn = new Client();
-      let output = "";
-      let errorOutput = "";
-
-      /* eslint-disable no-async-promise-executor */
-      const executePromise = new Promise<{
-        success: boolean;
-        output: string;
-        error?: string;
-      }>(async (resolve, reject) => {
-        const timeout = setTimeout(() => {
-          conn.end();
-          reject(new Error("Command execution timeout (30s)"));
-        }, 30000);
-
-        conn.on("ready", () => {
-          conn.exec(snippet.content, (err, stream) => {
-            if (err) {
-              clearTimeout(timeout);
-              conn.end();
-              return reject(err);
-            }
-
-            stream.on("close", () => {
-              clearTimeout(timeout);
-              conn.end();
-              if (errorOutput) {
-                resolve({ success: false, output, error: errorOutput });
-              } else {
-                resolve({ success: true, output });
-              }
-            });
-
-            stream.on("data", (data: Buffer) => {
-              output += data.toString();
-            });
-
-            stream.stderr.on("data", (data: Buffer) => {
-              errorOutput += data.toString();
-            });
-          });
-        });
-
-        conn.on("error", (err) => {
-          clearTimeout(timeout);
-          reject(err);
-        });
-
-        const config: Record<string, unknown> = {
-          host: host.ip,
-          port: host.port,
-          username: host.username,
-          tryKeyboard: true,
-          keepaliveInterval: 30000,
-          keepaliveCountMax: 3,
-          readyTimeout: 30000,
-          tcpKeepAlive: true,
-          tcpKeepAliveInitialDelay: 30000,
-          timeout: 30000,
-          env: {
-            TERM: "xterm-256color",
-            LANG: "en_US.UTF-8",
-            LC_ALL: "en_US.UTF-8",
-            LC_CTYPE: "en_US.UTF-8",
-            LC_MESSAGES: "en_US.UTF-8",
-            LC_MONETARY: "en_US.UTF-8",
-            LC_NUMERIC: "en_US.UTF-8",
-            LC_TIME: "en_US.UTF-8",
-            LC_COLLATE: "en_US.UTF-8",
-            COLORTERM: "truecolor",
-          },
-          algorithms: {
-            kex: [
-              "curve25519-sha256",
-              "curve25519-sha256@libssh.org",
-              "ecdh-sha2-nistp521",
-              "ecdh-sha2-nistp384",
-              "ecdh-sha2-nistp256",
-              "diffie-hellman-group-exchange-sha256",
-              "diffie-hellman-group14-sha256",
-              "diffie-hellman-group14-sha1",
-              "diffie-hellman-group-exchange-sha1",
-              "diffie-hellman-group1-sha1",
-            ],
-            serverHostKey: [
-              "ssh-ed25519",
-              "ecdsa-sha2-nistp521",
-              "ecdsa-sha2-nistp384",
-              "ecdsa-sha2-nistp256",
-              "rsa-sha2-512",
-              "rsa-sha2-256",
-              "ssh-rsa",
-              "ssh-dss",
-            ],
-            cipher: SSH_ALGORITHMS.cipher,
-            hmac: [
-              "hmac-sha2-512-etm@openssh.com",
-              "hmac-sha2-256-etm@openssh.com",
-              "hmac-sha2-512",
-              "hmac-sha2-256",
-              "hmac-sha1",
-              "hmac-md5",
-            ],
-            compress: ["none", "zlib@openssh.com", "zlib"],
-          },
-        };
-
-        if (authType === "password" && password) {
-          config.password = password;
-        } else if (authType === "key" && privateKey) {
-          const cleanKey = (privateKey as string)
-            .trim()
-            .replace(/\r\n/g, "\n")
-            .replace(/\r/g, "\n");
-          config.privateKey = Buffer.from(cleanKey, "utf8");
-          if (passphrase) {
-            config.passphrase = passphrase;
+      // Preserve the historical snippet-execution response contract:
+      // success is false when anything was written to stderr.
+      const result = execResult.stderr
+        ? {
+            success: false,
+            output: execResult.output,
+            error: execResult.stderr,
           }
-        } else if (authType === "agent") {
-          const result = await applyAgentAuth(
-            config,
-            host.terminalConfig as Record<string, unknown> | string | undefined,
-          );
-          if ("error" in result) {
-            throw new Error(result.error);
-          }
-        } else if (password) {
-          config.password = password;
-        } else if (privateKey) {
-          const cleanKey = (privateKey as string)
-            .trim()
-            .replace(/\r\n/g, "\n")
-            .replace(/\r/g, "\n");
-          config.privateKey = Buffer.from(cleanKey, "utf8");
-          if (passphrase) {
-            config.passphrase = passphrase;
-          }
-        }
-
-        conn.connect(config);
-      });
-      /* eslint-enable no-async-promise-executor */
-
-      const result = await executePromise;
+        : { success: true, output: execResult.output };
 
       authLogger.success(
         `Snippet executed: ${snippet.name} on host ${hostId}`,

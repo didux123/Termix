@@ -41,6 +41,7 @@ import { registerHostInternalRoutes } from "./host-internal-routes.js";
 import { registerHostNetworkRoutes } from "./host-network-routes.js";
 import { registerHostBulkRoutes } from "./host-bulk-routes.js";
 import { logAudit, getRequestMeta } from "../../utils/audit-logger.js";
+import { resolveHostAuth, runCommandOnHost } from "../../ssh/ssh-exec.js";
 
 const router = express.Router();
 
@@ -2632,6 +2633,116 @@ router.delete(
         hostId,
       });
       res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+/**
+ * @openapi
+ * /host/execute:
+ *   post:
+ *     summary: Execute a command on an SSH host
+ *     description: >
+ *       Runs a single non-interactive command on the target host over a fresh
+ *       SSH connection and returns its stdout, stderr and exit code. The host's
+ *       stored credentials (or its linked shared credential) are decrypted
+ *       server-side, so the caller only needs to reference the host by id.
+ *     tags:
+ *       - Hosts
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - hostId
+ *               - command
+ *             properties:
+ *               hostId:
+ *                 type: integer
+ *                 description: ID of the SSH host to run the command on.
+ *               command:
+ *                 type: string
+ *                 description: The shell command to execute.
+ *               timeout:
+ *                 type: integer
+ *                 description: Optional timeout in milliseconds (default 30000).
+ *     responses:
+ *       200:
+ *         description: Command completed (check exitCode for the process result).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   description: True when the process exited with code 0.
+ *                 output:
+ *                   type: string
+ *                   description: Captured stdout.
+ *                 stderr:
+ *                   type: string
+ *                   description: Captured stderr.
+ *                 exitCode:
+ *                   type: integer
+ *                   nullable: true
+ *                   description: Process exit code (null if terminated by signal).
+ *       400:
+ *         description: Invalid input.
+ *       404:
+ *         description: Host not found.
+ *       500:
+ *         description: Failed to execute the command (connection/auth/timeout).
+ */
+router.post(
+  "/execute",
+  authenticateJWT,
+  requireDataAccess,
+  async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).userId;
+    const { hostId, command, timeout } = req.body;
+
+    const parsedHostId =
+      typeof hostId === "number" ? hostId : parseInt(hostId, 10);
+
+    if (!userId || isNaN(parsedHostId)) {
+      return res.status(400).json({ error: "Valid hostId is required" });
+    }
+    if (typeof command !== "string" || command.trim().length === 0) {
+      return res.status(400).json({ error: "command is required" });
+    }
+
+    const timeoutMs =
+      typeof timeout === "number" && timeout > 0 ? timeout : undefined;
+
+    try {
+      const auth = await resolveHostAuth(parsedHostId, userId);
+      if (!auth) {
+        return res.status(404).json({ error: "Host not found" });
+      }
+
+      const result = await runCommandOnHost(auth, command, timeoutMs);
+
+      sshLogger.success(`Command executed on host ${parsedHostId}`, {
+        operation: "host_execute_success",
+        userId,
+        hostId: parsedHostId,
+        exitCode: result.exitCode,
+      });
+
+      res.json(result);
+    } catch (error) {
+      sshLogger.error("Failed to execute command on host", error, {
+        operation: "host_execute_failed",
+        userId,
+        hostId: parsedHostId,
+      });
+      res.status(500).json({
+        error:
+          error instanceof Error ? error.message : "Failed to execute command",
+      });
     }
   },
 );
