@@ -41,6 +41,7 @@ import { registerHostInternalRoutes } from "./host-internal-routes.js";
 import { registerHostNetworkRoutes } from "./host-network-routes.js";
 import { registerHostBulkRoutes } from "./host-bulk-routes.js";
 import { logAudit, getRequestMeta } from "../../utils/audit-logger.js";
+import { registerHostExecuteRoutes } from "./host-execute-routes.js";
 
 const router = express.Router();
 
@@ -2635,6 +2636,11 @@ router.delete(
     }
   },
 );
+
+registerHostExecuteRoutes(router, {
+  authenticateJWT,
+  requireDataAccess,
+});
 
 registerHostOpksshRoutes(router);
 

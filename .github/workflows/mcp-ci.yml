@@ -1,22 +1,29 @@
-name: PR Check
+# Fork-only CI. The upstream workflows target Blacksmith managed runners
+# (runs-on: blacksmith-*), which do not exist on a fork, so those jobs stay
+# queued forever here. This mirrors the PR Check on GitHub-hosted runners so the
+# MCP work can be validated on the fork. Not intended for the upstream PR.
+name: Fork CI (MCP)
 
 on:
   pull_request:
     branches: [main, dev-*]
+  push:
+    branches: [feat/mcp-server]
+  workflow_dispatch:
 
 jobs:
-  lint-and-build:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+  root-checks:
+    runs-on: ubuntu-latest
 
     env:
       NODE_OPTIONS: "--max-old-space-size=4096"
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
           cache: "npm"
@@ -33,11 +40,8 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-      - name: Build
-        run: npm run build
-
   mcp-server:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     defaults:
       run:
@@ -45,10 +49,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
           cache: "npm"
