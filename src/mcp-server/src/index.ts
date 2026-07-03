@@ -4,6 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { loadConfig } from "./config.js";
 import { TermixClient } from "./client/http.js";
 import { registerMonitoringTools } from "./tools/monitoring.js";
+import { registerExecTools } from "./tools/exec.js";
 import { logger } from "./util/logger.js";
 
 async function main(): Promise<void> {
@@ -16,6 +17,7 @@ async function main(): Promise<void> {
   });
 
   registerMonitoringTools(server, client);
+  registerExecTools(server, client);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
