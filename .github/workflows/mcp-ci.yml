@@ -1,0 +1,71 @@
+# Fork-only CI. The upstream workflows target Blacksmith managed runners
+# (runs-on: blacksmith-*), which do not exist on a fork, so those jobs stay
+# queued forever here. This mirrors the PR Check on GitHub-hosted runners so the
+# MCP work can be validated on the fork. Not intended for the upstream PR.
+name: Fork CI (MCP)
+
+on:
+  pull_request:
+    branches: [main, dev-*]
+  push:
+    branches: [feat/mcp-server]
+  workflow_dispatch:
+
+jobs:
+  root-checks:
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_OPTIONS: "--max-old-space-size=4096"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npx eslint .
+
+      - name: Run Prettier check
+        run: npx prettier --check .
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+  mcp-server:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: src/mcp-server
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+          cache-dependency-path: src/mcp-server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
