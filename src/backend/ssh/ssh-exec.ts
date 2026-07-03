@@ -31,7 +31,16 @@ export interface CommandResult {
   output: string;
   stderr: string;
   exitCode: number | null;
+  /** True when stdout and/or stderr were truncated at MAX_OUTPUT_BYTES. */
+  truncated: boolean;
 }
+
+/**
+ * Upper bound on captured stdout+stderr for a single command. Prevents an
+ * authenticated user from exhausting backend memory with an unbounded producer
+ * (e.g. `yes`). Anything past this is dropped and `truncated` is set.
+ */
+const MAX_OUTPUT_BYTES = 5_000_000;
 
 /**
  * Resolve and decrypt the SSH auth material for a host owned by `userId`.
@@ -123,6 +132,23 @@ export async function runCommandOnHost(
   const conn = new Client();
   let output = "";
   let errorOutput = "";
+  let truncated = false;
+
+  // Append to a capped buffer; once the combined size limit is reached we stop
+  // accumulating and flag the result as truncated.
+  const appendCapped = (current: string, chunk: string): string => {
+    if (truncated) return current;
+    const remaining = MAX_OUTPUT_BYTES - (output.length + errorOutput.length);
+    if (remaining <= 0) {
+      truncated = true;
+      return current;
+    }
+    if (chunk.length > remaining) {
+      truncated = true;
+      return current + chunk.slice(0, remaining);
+    }
+    return current + chunk;
+  };
 
   /* eslint-disable no-async-promise-executor */
   return new Promise<CommandResult>(async (resolve, reject) => {
@@ -147,25 +173,29 @@ export async function runCommandOnHost(
           clearTimeout(timeout);
           conn.end();
           resolve({
-            success: (code ?? 0) === 0,
+            // A null exit code means the process was killed by a signal, which
+            // is a failure — not a success.
+            success: code === 0,
             output,
             stderr: errorOutput,
             exitCode: code ?? null,
+            truncated,
           });
         });
 
         stream.on("data", (data: Buffer) => {
-          output += data.toString();
+          output = appendCapped(output, data.toString());
         });
 
         stream.stderr.on("data", (data: Buffer) => {
-          errorOutput += data.toString();
+          errorOutput = appendCapped(errorOutput, data.toString());
         });
       });
     });
 
     conn.on("error", (err) => {
       clearTimeout(timeout);
+      conn.end();
       reject(err);
     });
 
