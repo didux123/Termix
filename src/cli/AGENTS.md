@@ -11,19 +11,32 @@ Two ways to authenticate:
 # Interactive (humans): stores a session token (~30 days) in ~/.config/termix/config.json
 termix login
 
-# Non-interactive (agents/CI): set env vars — they override the config file
+# Non-interactive (agents/CI): set env vars
 export TERMIX_URL=https://termix.example.com
-export TERMIX_TOKEN=<jwt>          # full access (get one via `termix login`, or ask the user)
-# or: export TERMIX_API_KEY=tmx_…  # read-only, non-encrypted endpoints only (alerts, version)
+export TERMIX_TOKEN=<jwt>          # session token — full access (get one via `termix login`)
+# or: export TERMIX_API_KEY=tmx_…  # API key — see the scope note below
 ```
 
-Check auth state with `termix whoami`. If a command fails with HTTP 401, the session expired —
-ask the user to run `termix login` again.
+If either `TERMIX_TOKEN` or `TERMIX_API_KEY` is set, the environment credential is used and the
+stored config-file token is ignored; with neither set, the config-file token is used.
+
+**API-key scope is not a hard boundary.** An API key is generally limited to non-encrypted endpoints
+(alerts, version, and — depending on server state — some reads), but it can reach more when the
+server still holds the user's data key in memory from a recent login. Do **not** rely on an API key
+as a read-only guarantee; if you need full access use a token, and if you must stay limited, assume
+nothing and check what actually works.
+
+Check auth state with `termix whoami` (it reports `authMethod: "token"` or `"apiKey"`). If a command
+fails with HTTP 401, the session expired — ask the user to run `termix login` again.
 
 ## Commands
 
 All commands print JSON on stdout, except `exec` and `snippets run` which stream the remote
 command's stdout/stderr directly. Run `termix <group> --help` for the full option list.
+
+**Exit codes:** `0` on success; a CLI/API error exits `1` for most commands, but `exec` and
+`snippets run` exit `255` for a CLI/API error (so that any 0–254 code is unambiguously the _remote_
+command's own exit code). See the `exec` section below.
 
 **Hosts**
 

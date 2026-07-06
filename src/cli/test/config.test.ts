@@ -79,6 +79,24 @@ describe("resolveConfig", () => {
     expect(cfg.token).toBe("env-token");
   });
 
+  it("an env API key overrides the stored token instead of being ignored", () => {
+    saveStoredConfig({ url: "http://stored.local", token: "stored" }, env);
+    const cfg = resolveConfig({
+      ...env,
+      TERMIX_API_KEY: "tmx_key",
+    } as NodeJS.ProcessEnv);
+    // The stored token must NOT leak through when an env API key is set.
+    expect(cfg.token).toBeUndefined();
+    expect(cfg.apiKey).toBe("tmx_key");
+  });
+
+  it("still uses the stored token when no auth env var is set", () => {
+    saveStoredConfig({ url: "http://stored.local", token: "stored" }, env);
+    const cfg = resolveConfig(env);
+    expect(cfg.token).toBe("stored");
+    expect(cfg.apiKey).toBeUndefined();
+  });
+
   it("validates TERMIX_REQUEST_TIMEOUT_MS", () => {
     expect(() =>
       resolveConfig({

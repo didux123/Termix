@@ -26,16 +26,22 @@ model as the Termix desktop app. When the token expires, run `termix login` agai
 
 For scripts/CI/agents, environment variables override the config file:
 
-| Variable                    | Purpose                                                      |
-| --------------------------- | ------------------------------------------------------------ |
-| `TERMIX_URL`                | Base URL of the instance.                                    |
-| `TERMIX_TOKEN`              | Session JWT (full access).                                   |
-| `TERMIX_API_KEY`            | API key (`tmx_…`) — read-only, non-encrypted endpoints only. |
-| `TERMIX_INSECURE_TLS`       | `true` to accept self-signed certificates (test only).       |
-| `TERMIX_REQUEST_TIMEOUT_MS` | Per-request timeout (default 60000).                         |
+| Variable                    | Purpose                                                     |
+| --------------------------- | ----------------------------------------------------------- |
+| `TERMIX_URL`                | Base URL of the instance.                                   |
+| `TERMIX_TOKEN`              | Session JWT (full access).                                  |
+| `TERMIX_API_KEY`            | API key (`tmx_…`) — usually limited to non-encrypted reads. |
+| `TERMIX_INSECURE_TLS`       | `true` to accept self-signed certificates (test only).      |
+| `TERMIX_REQUEST_TIMEOUT_MS` | Per-request timeout (default 60000).                        |
 
-> Note: Termix API keys cannot decrypt user data (hosts, snippets, execution) — that requires a
-> session token from `termix login`.
+Setting `TERMIX_TOKEN` or `TERMIX_API_KEY` makes the environment credential win as a unit: the
+stored config-file token is then ignored (so an explicit API key can't be silently overridden by a
+leftover token). With no auth env var set, the config-file token is used.
+
+> Note: an API key normally can't decrypt user data (hosts, snippets, execution) — that needs a
+> session token from `termix login`. But this is a server-side limit, not a guarantee the CLI
+> enforces: an API key can reach more while the server still holds the user's data key in memory
+> from a recent login. Don't treat an API key as a hard read-only boundary.
 
 ## Usage
 

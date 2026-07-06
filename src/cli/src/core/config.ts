@@ -107,10 +107,19 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): CliConfig {
     throw new Error("TERMIX_REQUEST_TIMEOUT_MS must be a positive number.");
   }
 
+  // Auth precedence: if either auth credential is set in the environment, the
+  // environment wins as a unit — the stored file token is NOT used as a
+  // fallback. Otherwise an explicit TERMIX_API_KEY would be silently overridden
+  // by a leftover token in the config file (the caller thinks they scoped down
+  // to a read-only key but keep full token access).
+  const envToken = env.TERMIX_TOKEN || undefined;
+  const envApiKey = env.TERMIX_API_KEY || undefined;
+  const hasEnvAuth = Boolean(envToken || envApiKey);
+
   return {
     url: url.replace(/\/+$/, ""),
-    token: env.TERMIX_TOKEN || stored?.token || undefined,
-    apiKey: env.TERMIX_API_KEY || undefined,
+    token: envToken || (hasEnvAuth ? undefined : stored?.token),
+    apiKey: envApiKey,
     username: stored?.username,
     insecureTls: env.TERMIX_INSECURE_TLS === "true",
     requestTimeoutMs: timeoutMs,
