@@ -69,7 +69,9 @@ export class TermixClient {
       if (res.status === 401 && !opts.noAuth) {
         message += " — your session may have expired; run `termix login`.";
       } else if (res.status === 403) {
-        message += " — this action requires an admin account.";
+        // 403 also covers not-owner/access-denied, not just missing admin.
+        message +=
+          " — permission denied (admin-only endpoints also return 403).";
       }
       throw new TermixApiError(message, res.status, opts.path);
     }

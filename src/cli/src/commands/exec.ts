@@ -22,12 +22,15 @@ export function wrapCommand(command: string): string {
   return `(\n${command}\n)\nprintf '\\n${EXIT_MARKER}%d\\n' "$?"`;
 }
 
+/** Matches the trailing exit marker; built from EXIT_MARKER so they can't diverge. */
+const EXIT_MARKER_RE = new RegExp(`\\n?${EXIT_MARKER}(\\d+)\\s*$`);
+
 /** Split the marker out of the captured stdout. */
 export function parseExecOutput(raw: string): {
   output: string;
   exitCode: number | null;
 } {
-  const match = raw.match(/\n?__TERMIX_EXIT=(\d+)\s*$/);
+  const match = raw.match(EXIT_MARKER_RE);
   if (!match) {
     return { output: raw, exitCode: null };
   }

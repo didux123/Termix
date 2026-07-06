@@ -99,7 +99,7 @@ export function registerAuthCommands(program: Command): void {
         });
 
         if (res.requires_totp && res.temp_token) {
-          const totpCode = await prompt("TOTP code: ");
+          const totpCode = await promptHidden("TOTP code: ");
           res = await client.request<LoginResponse>({
             method: "POST",
             path: "/users/totp/verify-login",

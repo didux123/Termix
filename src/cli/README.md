@@ -58,8 +58,9 @@ termix version
 ```
 
 Run `termix <group> --help` for the full option list. All output is JSON, except `exec`/`snippets
-run` which stream the remote stdout/stderr and exit with the remote command's exit code (255 on
-CLI/API errors).
+run` which stream the remote stdout/stderr. `exec` exits with the remote command's exit code;
+`snippets run` exits 0 when the snippet produced no stderr output and 1 otherwise (the snippet API
+does not expose the real exit code). Both exit 255 on CLI/API errors.
 
 ## Scope
 
