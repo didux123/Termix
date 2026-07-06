@@ -139,6 +139,13 @@ export function registerHostCommands(program: Command): void {
       if (!opts.ip || !opts.username) {
         throw new Error("`hosts create` requires --ip and --username.");
       }
+      // Sensible create defaults: Termix requires a valid port, and the auth
+      // type can be inferred from whichever secret was supplied.
+      if (opts.port === undefined) opts.port = "22";
+      if (opts.authType === undefined) {
+        if (opts.password !== undefined) opts.authType = "password";
+        else if (opts.keyFile !== undefined) opts.authType = "key";
+      }
       const client = new TermixClient(resolveConfig());
       const created = await client.request<Record<string, unknown>>({
         method: "POST",
