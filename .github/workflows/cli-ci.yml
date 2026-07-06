@@ -1,0 +1,40 @@
+# Fork-only CI for the termix CLI sub-package.
+#
+# Upstream's own workflows target self-hosted runners (runs-on: blacksmith-*),
+# which do not exist on a fork, so this workflow provides minimal checks on
+# github-hosted runners for the feat/cli branch.
+name: cli
+
+on:
+  pull_request:
+    paths:
+      - "src/cli/**"
+      - ".github/workflows/cli-ci.yml"
+  push:
+    branches: [feat/cli]
+
+jobs:
+  cli:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.12"
+      # `npm install` rather than `npm ci`: a transitive WASM optional dep in the
+      # vitest toolchain (@rolldown/binding-wasm32-wasi → @emnapi/*) resolves to
+      # different patch versions across platforms, which makes the strict
+      # lockfile check of `npm ci` flaky. `npm install` tolerates that drift.
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Type-check
+        run: npm run type-check
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Smoke (--help)
+        run: node dist/index.js --help

@@ -17,6 +17,8 @@
       "!!release",
       "!!node_modules",
       "!!src/mcp-server/node_modules",
+      "!!src/cli/node_modules",
+      "!!src/cli/dist",
       "!!db",
       "!!.env",
       "!!**/*.min.js",
