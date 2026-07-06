@@ -94,8 +94,10 @@ export function registerExecCommands(program: Command): void {
         if (result.error) process.stderr.write(result.error);
 
         // Marker missing means the wrapper never ran (e.g. server timeout):
-        // fall back to the API's stderr-based success flag.
-        process.exit(exitCode ?? (result.success ? 0 : 1));
+        // fall back to the API's stderr-based success flag. Set exitCode
+        // instead of calling process.exit() so a piped stdout fully drains
+        // before the process terminates.
+        process.exitCode = exitCode ?? (result.success ? 0 : 1);
       } catch (error) {
         fail(error, 255);
       }

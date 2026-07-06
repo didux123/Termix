@@ -1,5 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { buildHostPayload } from "../src/commands/host-fields.js";
+import { parseId } from "../src/commands/hosts.js";
+
+describe("parseId", () => {
+  it("parses positive integers", () => {
+    expect(parseId("7")).toBe(7);
+  });
+
+  it("rejects non-integers with the default label", () => {
+    expect(() => parseId("abc")).toThrow(/Invalid id: "abc"/);
+  });
+
+  it("uses the provided label in the error message", () => {
+    expect(() => parseId("nope", "--limit")).toThrow(/Invalid --limit/);
+  });
+});
 
 describe("buildHostPayload", () => {
   it("always sets connectionType and includes only provided fields", () => {

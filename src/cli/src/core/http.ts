@@ -34,6 +34,11 @@ export class TermixClient {
   private readonly axios: AxiosInstance;
 
   constructor(private readonly config: CliConfig) {
+    if (config.insecureTls) {
+      process.stderr.write(
+        "termix: warning: TERMIX_INSECURE_TLS=true — TLS certificate verification is disabled\n",
+      );
+    }
     this.axios = axios.create({
       baseURL: config.url,
       timeout: config.requestTimeoutMs,

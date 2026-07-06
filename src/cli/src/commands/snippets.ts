@@ -4,12 +4,7 @@ import { resolveConfig } from "../core/config.js";
 import { TermixClient } from "../core/http.js";
 import { fail, printJson, run } from "../core/output.js";
 import { parseId } from "./hosts.js";
-
-interface SnippetExecuteResponse {
-  success: boolean;
-  output?: string;
-  error?: string;
-}
+import type { SnippetExecuteResponse } from "./exec.js";
 
 /** Resolve snippet content from --content or --content-file (mutually exclusive). */
 function resolveContent(opts: {
@@ -162,7 +157,9 @@ export function registerSnippetCommands(program: Command): void {
 
         if (result.output) process.stdout.write(result.output);
         if (result.error) process.stderr.write(result.error);
-        process.exit(result.success ? 0 : 1);
+        // Set exitCode instead of calling process.exit() so a piped stdout
+        // fully drains before the process terminates.
+        process.exitCode = result.success ? 0 : 1;
       } catch (error) {
         fail(error, 255);
       }

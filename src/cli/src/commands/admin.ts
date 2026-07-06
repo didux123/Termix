@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { resolveConfig } from "../core/config.js";
 import { TermixClient } from "../core/http.js";
 import { printJson, run } from "../core/output.js";
+import { parseId } from "./hosts.js";
 
 /**
  * Admin/read commands. These endpoints are gated server-side to admin accounts;
@@ -20,7 +21,7 @@ export function registerAdminCommands(program: Command): void {
       run(async () => {
         const client = new TermixClient(resolveConfig());
         const params: Record<string, unknown> = {};
-        if (opts.limit) params.limit = Number(opts.limit);
+        if (opts.limit) params.limit = parseId(opts.limit, "--limit");
         if (opts.action) params.action = opts.action;
         if (opts.user) params.userId = opts.user;
         const data = await client.request({

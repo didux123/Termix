@@ -11,8 +11,9 @@ import {
 /**
  * Non-secret host fields safe to print. An allowlist (vs deleting known secret
  * keys) guarantees that any future secret field added by the backend cannot
- * leak by default. Note: list/get responses carry secrets encrypted, but the
- * CLI still never prints them.
+ * leak by default. The backend already strips secrets from list/get responses
+ * (stripSensitiveFields, replacing them with `has*` flags); the allowlist is
+ * defense-in-depth on top of that.
  */
 const SAFE_HOST_FIELDS = [
   "id",
@@ -180,12 +181,17 @@ export function registerHostCommands(program: Command): void {
 
       // Termix's PUT replaces the whole host definition and requires ip/port,
       // so read-modify-write: fetch the current host, apply the CLI overrides,
-      // and send the merged object. Secrets are never returned by GET, so
-      // omitting them here means the server keeps the existing password/key.
+      // and send the merged object. The server strips secrets from GET
+      // responses, so omitting them here means it keeps the existing
+      // password/key.
       const current = await client.request<Record<string, unknown>>({
         method: "GET",
         path: `/host/db/host/${id}`,
       });
+      // Defensive: never round-trip a secret field the server might return in
+      // the future (strip from `current`, not `merged`, so secrets passed via
+      // CLI options survive).
+      for (const key of ["password", "key", "keyPassword"]) delete current[key];
       const merged = { ...current, ...buildHostPayload(opts) };
       for (const key of SERVER_MANAGED_HOST_FIELDS) delete merged[key];
 
@@ -213,10 +219,12 @@ export function registerHostCommands(program: Command): void {
     );
 }
 
-export function parseId(value: string): number {
+export function parseId(value: string, label = "id"): number {
   const id = Number(value);
   if (!Number.isInteger(id) || id <= 0) {
-    throw new Error(`Invalid id: "${value}" (expected a positive integer).`);
+    throw new Error(
+      `Invalid ${label}: "${value}" (expected a positive integer).`,
+    );
   }
   return id;
 }

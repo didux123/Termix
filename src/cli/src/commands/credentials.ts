@@ -5,6 +5,42 @@ import { TermixClient } from "../core/http.js";
 import { printJson, run } from "../core/output.js";
 import { parseId } from "./hosts.js";
 
+/**
+ * Non-secret credential fields safe to print, mirroring the allowlist approach
+ * used for hosts. This is load-bearing: unlike the hosts endpoints, the
+ * backend's GET /credentials/:id returns the plaintext password/key/keyPassword,
+ * so printing anything outside this list could leak a secret.
+ */
+const SAFE_CREDENTIAL_FIELDS = [
+  "id",
+  "name",
+  "description",
+  "folder",
+  "tags",
+  "authType",
+  "username",
+  "publicKey",
+  "hasCertPublicKey",
+  "keyType",
+  "detectedKeyType",
+  "usageCount",
+  "lastUsed",
+  "createdAt",
+  "updatedAt",
+  "hasKey",
+  "hasKeyPassword",
+] as const;
+
+export function sanitiseCredential(
+  cred: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of SAFE_CREDENTIAL_FIELDS) {
+    if (key in cred) out[key] = cred[key];
+  }
+  return out;
+}
+
 interface CredentialOpts {
   name?: string;
   description?: string;
@@ -75,11 +111,11 @@ export function registerCredentialCommands(program: Command): void {
     .action(async () =>
       run(async () => {
         const client = new TermixClient(resolveConfig());
-        const creds = await client.request({
+        const creds = await client.request<Array<Record<string, unknown>>>({
           method: "GET",
           path: "/credentials",
         });
-        printJson(creds);
+        printJson(creds.map(sanitiseCredential));
       }),
     );
 
@@ -93,8 +129,7 @@ export function registerCredentialCommands(program: Command): void {
           method: "GET",
           path: `/credentials/${parseId(credentialId)}`,
         });
-        for (const key of ["password", "key", "keyPassword"]) delete cred[key];
-        printJson(cred);
+        printJson(sanitiseCredential(cred));
       }),
     );
 
