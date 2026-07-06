@@ -76,9 +76,18 @@ termix exec 3 "systemctl is-active nginx" && echo "nginx up"
 - Remote stdout → stdout, remote stderr → stderr.
 - **The exit code is the remote command's exit code** (like `ssh`). 255 means a CLI/API error
   (bad auth, host not found, connection failure) — the message is on stderr.
-- Commands run non-interactively in a fresh SSH session with a **30-second server-side timeout**:
-  no TTY, no stdin, no long-running processes. For anything longer, run it detached
-  (`nohup … &`, `systemd-run`, etc.) and poll.
+- Each call runs non-interactively in a **fresh** SSH session with a **30-second server-side
+  timeout**: no TTY, no stdin, nothing persists between calls. Treat `exec` as short and synchronous.
+- **Long-running / persistent work:** a plain `nohup … &` is unreliable — the process is tied to the
+  exec session and usually does not survive it, and backgrounding a process that keeps the channel
+  open can make the call hang until it times out (redirect all fds: `>/tmp/x.log 2>&1`). For a service
+  that must outlive the call, detach at the OS level instead: `docker run -d …`, `systemd-run --unit …`,
+  or a systemd unit — these are managed by the host, not the SSH session, and survive. Then poll with a
+  separate `exec`.
+- **Container images:** a `docker run` that has to pull a missing image can exceed the 30-second
+  timeout — pre-pull, or rely on already-cached images.
+- Polling tip: don't `pgrep`/`grep` for a string that also appears in your own command line (it matches
+  itself). Check the real signal instead (a listening port, `docker ps`, an HTTP response).
 - Quote the command as a single argument to avoid shell-splitting surprises.
 - The host id comes from `termix hosts list`.
 
