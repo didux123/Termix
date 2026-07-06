@@ -11,6 +11,7 @@ export interface HostFieldOpts {
   password?: string;
   keyFile?: string;
   keyPassword?: string;
+  credentialId?: string;
   folder?: string;
   tags?: string;
   enableTerminal?: boolean;
@@ -30,6 +31,10 @@ export function addHostFieldOptions(cmd: Command): Command {
     .option("--password <password>", "Password (authType=password)")
     .option("--key-file <path>", "Path to a private key file (authType=key)")
     .option("--key-password <passphrase>", "Passphrase for the private key")
+    .option(
+      "--credential-id <id>",
+      "Use a saved shared credential instead of inline secrets",
+    )
     .option("--folder <folder>", "Folder to place the host in")
     .option("--tags <tags>", "Comma-separated tags")
     .option("--enable-terminal", "Enable the terminal for this host")
@@ -55,6 +60,13 @@ export function buildHostPayload(opts: HostFieldOpts): Record<string, unknown> {
   if (opts.password !== undefined) body.password = opts.password;
   if (opts.keyFile !== undefined) body.key = readKeyFile(opts.keyFile);
   if (opts.keyPassword !== undefined) body.keyPassword = opts.keyPassword;
+  if (opts.credentialId !== undefined) {
+    const id = Number(opts.credentialId);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error(`Invalid --credential-id: "${opts.credentialId}".`);
+    }
+    body.credentialId = id;
+  }
   if (opts.folder !== undefined) body.folder = opts.folder;
   if (opts.tags !== undefined) body.tags = splitTags(opts.tags);
   if (opts.enableTerminal !== undefined)

@@ -139,6 +139,17 @@ export function registerHostCommands(program: Command): void {
       if (!opts.ip || !opts.username) {
         throw new Error("`hosts create` requires --ip and --username.");
       }
+      // Require an auth method up front: without one the backend returns an
+      // opaque HTTP 500, so fail here with an actionable message instead.
+      if (
+        opts.password === undefined &&
+        opts.keyFile === undefined &&
+        opts.credentialId === undefined
+      ) {
+        throw new Error(
+          "`hosts create` needs an auth method: pass --password, --key-file or --credential-id.",
+        );
+      }
       // Sensible create defaults: Termix requires a valid port, and the auth
       // type can be inferred from whichever secret was supplied.
       if (opts.port === undefined) opts.port = "22";

@@ -63,6 +63,8 @@ export class TermixClient {
       let message = extractError(res.data) ?? `HTTP ${res.status}`;
       if (res.status === 401 && !opts.noAuth) {
         message += " — your session may have expired; run `termix login`.";
+      } else if (res.status === 403) {
+        message += " — this action requires an admin account.";
       }
       throw new TermixApiError(message, res.status, opts.path);
     }

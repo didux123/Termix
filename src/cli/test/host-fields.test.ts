@@ -36,4 +36,11 @@ describe("buildHostPayload", () => {
   it("rejects an invalid auth type", () => {
     expect(() => buildHostPayload({ authType: "totp" })).toThrow(/auth-type/i);
   });
+
+  it("maps a numeric credential id and rejects a non-numeric one", () => {
+    expect(buildHostPayload({ credentialId: "5" }).credentialId).toBe(5);
+    expect(() => buildHostPayload({ credentialId: "abc" })).toThrow(
+      /credential-id/i,
+    );
+  });
 });
