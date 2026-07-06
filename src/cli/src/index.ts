@@ -4,6 +4,10 @@ import { Command } from "commander";
 import { registerAuthCommands } from "./commands/login.js";
 import { registerHostCommands } from "./commands/hosts.js";
 import { registerExecCommands } from "./commands/exec.js";
+import { registerSnippetCommands } from "./commands/snippets.js";
+import { registerCredentialCommands } from "./commands/credentials.js";
+import { registerAlertCommands } from "./commands/alerts.js";
+import { registerAdminCommands } from "./commands/admin.js";
 import { registerMiscCommands } from "./commands/misc.js";
 
 const pkg = JSON.parse(
@@ -24,6 +28,10 @@ program
 registerAuthCommands(program);
 registerHostCommands(program);
 registerExecCommands(program);
+registerSnippetCommands(program);
+registerCredentialCommands(program);
+registerAlertCommands(program);
+registerAdminCommands(program);
 registerMiscCommands(program, pkg.version);
 
 program.parseAsync(process.argv).catch((error) => {

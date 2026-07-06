@@ -43,21 +43,34 @@ For scripts/CI/agents, environment variables override the config file:
 termix hosts list
 termix hosts get 3
 termix hosts status
+termix hosts create --ip 10.0.0.5 --username root --password secret --enable-terminal
+termix hosts update 3 --folder prod
+termix hosts delete 3
 termix exec 3 "uptime"
 termix snippets list
+termix snippets create --name deploy --content "docker compose up -d"
 termix snippets run 7 --host 3
+termix credentials list
 termix alerts
+termix users list          # admin
 termix whoami
 termix version
 ```
 
-All output is JSON, except `exec`/`snippets run` which stream the remote stdout/stderr and exit
-with the remote command's exit code (255 on CLI/API errors).
+Run `termix <group> --help` for the full option list. All output is JSON, except `exec`/`snippets
+run` which stream the remote stdout/stderr and exit with the remote command's exit code (255 on
+CLI/API errors).
 
-## Scope (v1)
+## Scope
 
-Stateless Termix API endpoints only: hosts (read + status), command execution, snippets, alerts.
-The session-based APIs (file manager, Docker, live metrics) are intentionally out of scope.
+Stateless Termix API endpoints: hosts (full CRUD + status), command execution, snippets (CRUD),
+credentials (CRUD, metadata-only reads), alerts, users and audit logs. The session-based APIs
+(file manager, Docker, live metrics) are intentionally out of scope — they need connection
+lifecycles that don't fit a one-shot CLI.
+
+`hosts update` reads the current host, applies your changes and writes it back; SSH secrets are
+never returned by the API, so they are preserved untouched unless you pass a new `--password` /
+`--key-file`.
 
 ## Development
 

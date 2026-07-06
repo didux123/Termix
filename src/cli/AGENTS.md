@@ -23,21 +23,48 @@ ask the user to run `termix login` again.
 ## Commands
 
 All commands print JSON on stdout, except `exec` and `snippets run` which stream the remote
-command's stdout/stderr directly.
+command's stdout/stderr directly. Run `termix <group> --help` for the full option list.
 
-| Command                                           | Description                                                                        |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `termix login [--url <url>] [--username <u>]`     | Interactive login (prompts on stderr; supports TOTP).                              |
-| `termix logout`                                   | Delete the stored session.                                                         |
-| `termix whoami`                                   | Current user, auth method, token expiry.                                           |
-| `termix hosts list [--folder <f>]`                | List SSH hosts (`{count, hosts: [{id, name, ip, port, username, folder, tags}]}`). |
-| `termix hosts get <hostId>`                       | One host's config. Secrets are never printed.                                      |
-| `termix hosts status [hostId]`                    | Online/offline status (all hosts, or one).                                         |
-| `termix exec <hostId> <command...>`               | Run a shell command on the host over SSH.                                          |
-| `termix snippets list`                            | List saved command snippets.                                                       |
-| `termix snippets run <snippetId> --host <hostId>` | Run a saved snippet on a host.                                                     |
-| `termix alerts`                                   | Active Termix alerts.                                                              |
-| `termix version`                                  | CLI version + server health/version.                                               |
+**Hosts**
+
+| Command                                                                                    | Description                                                  |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `termix hosts list [--folder <f>]`                                                         | List SSH hosts (`{count, hosts: [...]}`).                    |
+| `termix hosts get <hostId>`                                                                | One host's config. Secrets are never printed.                |
+| `termix hosts status [hostId]`                                                             | Online/offline status (all hosts, or one).                   |
+| `termix hosts create --ip <ip> --username <u> [--password <p> \| --key-file <path>] [...]` | Create a host.                                               |
+| `termix hosts update <hostId> [--name <n>] [...]`                                          | Update a host (only the fields you pass; secrets preserved). |
+| `termix hosts delete <hostId>`                                                             | Delete a host.                                               |
+
+**Command execution**
+
+| Command                                                                    | Description                               |
+| -------------------------------------------------------------------------- | ----------------------------------------- |
+| `termix exec <hostId> <command...>`                                        | Run a shell command on the host over SSH. |
+| `termix snippets list`                                                     | List saved snippets.                      |
+| `termix snippets run <snippetId> --host <hostId>`                          | Run a saved snippet on a host.            |
+| `termix snippets create --name <n> --content <c>`                          | Create a snippet.                         |
+| `termix snippets update <snippetId> [...]` / `snippets delete <snippetId>` | Update / delete a snippet.                |
+
+**Credentials, alerts, admin**
+
+| Command                                                                  | Description                                                          |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `termix credentials list / get / create / update / delete`               | Manage saved SSH credentials (metadata only; secrets never printed). |
+| `termix alerts [list]` / `alerts dismiss <id>` / `alerts undismiss <id>` | List and dismiss alerts.                                             |
+| `termix users list`                                                      | List user accounts (admin; 403 otherwise).                           |
+| `termix audit-logs [--limit <n>] [--action <a>]`                         | Audit-log entries (admin; 403 otherwise).                            |
+
+**Session**
+
+| Command                                       | Description                                           |
+| --------------------------------------------- | ----------------------------------------------------- |
+| `termix login [--url <url>] [--username <u>]` | Interactive login (prompts on stderr; supports TOTP). |
+| `termix logout` / `termix whoami`             | Clear the session / show current user + token expiry. |
+| `termix version`                              | CLI version + server health/version.                  |
+
+For destructive commands (`hosts delete`, `credentials delete`, `snippets delete`), the caller is
+responsible for confirmation — they act immediately with no prompt so they stay scriptable.
 
 ## Running commands (`exec`)
 

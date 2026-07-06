@@ -8,17 +8,6 @@ export function registerMiscCommands(
   cliVersion: string,
 ): void {
   program
-    .command("alerts")
-    .description("List active Termix alerts and notifications.")
-    .action(async () =>
-      run(async () => {
-        const client = new TermixClient(resolveConfig());
-        const alerts = await client.request({ method: "GET", path: "/alerts" });
-        printJson(alerts);
-      }),
-    );
-
-  program
     .command("version")
     .description("Show the CLI version and the server's health and version.")
     .action(async () =>

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Command } from "commander";
 import { resolveConfig } from "../core/config.js";
 import { TermixClient } from "../core/http.js";
-import { fail, printJson, run } from "../core/output.js";
+import { fail } from "../core/output.js";
 import { parseId } from "./hosts.js";
 
 const EXIT_MARKER = "__TERMIX_EXIT=";
@@ -96,56 +96,6 @@ export function registerExecCommands(program: Command): void {
         // Marker missing means the wrapper never ran (e.g. server timeout):
         // fall back to the API's stderr-based success flag.
         process.exit(exitCode ?? (result.success ? 0 : 1));
-      } catch (error) {
-        fail(error, 255);
-      }
-    });
-
-  const snippets = program
-    .command("snippets")
-    .description("List and run the command snippets saved in Termix.");
-
-  snippets
-    .command("list")
-    .description("List saved snippets (id, name, description, folder).")
-    .action(async () =>
-      run(async () => {
-        const client = new TermixClient(resolveConfig());
-        const all = await client.request<Array<Record<string, unknown>>>({
-          method: "GET",
-          path: "/snippets",
-        });
-        const summaries = all.map((s) => ({
-          id: s.id,
-          name: s.name,
-          description: s.description ?? null,
-          folder: s.folder ?? null,
-        }));
-        printJson({ count: summaries.length, snippets: summaries });
-      }),
-    );
-
-  snippets
-    .command("run <snippetId>")
-    .description(
-      "Execute a saved snippet on a host. Prints remote stdout/stderr; exits 0 when the snippet produced no stderr, 1 otherwise (the API does not expose the exit code).",
-    )
-    .requiredOption("--host <hostId>", "Host id to run the snippet on")
-    .action(async (snippetIdArg: string, opts: { host: string }) => {
-      try {
-        const snippetId = parseId(snippetIdArg);
-        const hostId = parseId(opts.host);
-        const client = new TermixClient(resolveConfig());
-
-        const result = await client.request<SnippetExecuteResponse>({
-          method: "POST",
-          path: "/snippets/execute",
-          data: { snippetId, hostId },
-        });
-
-        if (result.output) process.stdout.write(result.output);
-        if (result.error) process.stderr.write(result.error);
-        process.exit(result.success ? 0 : 1);
       } catch (error) {
         fail(error, 255);
       }
